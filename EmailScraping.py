@@ -54,6 +54,11 @@ def emailsLeechFunc(url, i):
         else:
             pass    
       
+def add_http_if_missing(url):
+        if not url.startswith('http://') and not url.startswith('https://'):
+            url = 'http://' + url
+        return url
+
 # TODO: Open a file for reading urls
 start = time.time()
 urlFile = open("urls.txt", 'r')
@@ -62,6 +67,7 @@ i=0
 #Iterate Opened file for getting single url
 for urlLink in urlFile.readlines():
     urlLink = urlLink.strip('\'"')
+    urlLink = add_http_if_missing(urlLink)
     i=i+1
     emailsLeechFunc(urlLink, i)
 print ("Elapsed Time: %s" % (time.time() - start))
