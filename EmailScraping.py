@@ -1,5 +1,9 @@
 #! python3
 import re, urllib.request, time
+from urllib.parse import urlparse
+
+from bs4 import BeautifulSoup
+from loguru import logger
 
 emailRegex = re.compile(r'''
 #example :
@@ -28,10 +32,13 @@ def extractEmailsFromUrlText(urlText):
 #HtmlPage Read Func
 def htmlPageRead(url, i):
     try:
+        logger.info(f"Reading HTML Page {url}")
         start = time.time()
         headers = { 'User-Agent' : 'Mozilla/5.0' }
         request = urllib.request.Request(url, None, headers)
+        logger.info(f"Requesting {url}")
         response = urllib.request.urlopen(request)
+        logger.info(f"Response from {url}")
         urlHtmlPageRead = response.read()
         urlText = urlHtmlPageRead.decode()
         print ("%s.%s\tFetched in : %s" % (i, url, (time.time() - start)))
@@ -41,17 +48,19 @@ def htmlPageRead(url, i):
     
 #EmailsLeechFunction
 def emailsLeechFunc(url, i):
-    
     try:
         htmlPageRead(url,i)
     except urllib.error.HTTPError as err:
         if err.code == 404:
             try:
+                logger.info(f"Fetching Cached Page {url}")
                 url = 'http://webcache.googleusercontent.com/search?q=cache:'+url
                 htmlPageRead(url, i)
             except:
+                logger.info(f"Error in fetching Cached Page {url}")
                 pass
         else:
+            logger.info(f"Error in fetching {url}")
             pass    
       
 def add_http_if_missing(url):
@@ -59,7 +68,36 @@ def add_http_if_missing(url):
             url = 'http://' + url
         return url
 
-# TODO: Open a file for reading urls
+def fetch_internal_links(url) -> list:
+    logger.info(f"Fetching Internal Links from {url}")
+    headers = { 'User-Agent' : 'Mozilla/5.0' }
+    request = urllib.request.Request(url, None, headers)
+    logger.info(f"Requesting {url}")
+    response = urllib.request.urlopen(request)
+    logger.info(f"Response from {url}")
+    soup = BeautifulSoup(response, 'html.parser')
+    internal_links = []
+    url_domain = urlparse(url).netloc  # Get domain of the URL
+
+    excluded_domains = ['twitter', 'facebook', 'instagram', 'linkedin', 'youtube', 'reddit', 'google', 'yandex']
+
+    for link in soup.find_all('a'):
+        href = link.get('href')
+        if href:
+            href_domain = urlparse(href).netloc  # Get domain of the href
+            # Only add href to internal_links if its domain matches the URL's domain
+            # and it does not belong to the excluded domains
+            if not any(excluded in href_domain for excluded in excluded_domains):
+                internal_links.append(href)
+    logger.info(f"Found {len(internal_links)} internal links.")
+    return internal_links
+
+
+links = fetch_internal_links('http://prota.com.tr')
+for link in links:
+    logger.info(link)
+
+
 start = time.time()
 urlFile = open("urls.txt", 'r')
 emailFile = open("emails.txt", 'a')
@@ -68,8 +106,11 @@ i=0
 for urlLink in urlFile.readlines():
     urlLink = urlLink.strip('\'"')
     urlLink = add_http_if_missing(urlLink)
-    i=i+1
-    emailsLeechFunc(urlLink, i)
+    urls = fetch_internal_links(urlLink)
+    for url in urls:
+        i = i + 1
+        emailsLeechFunc(url, i)
+
 print ("Elapsed Time: %s" % (time.time() - start))
 
 urlFile.close()
