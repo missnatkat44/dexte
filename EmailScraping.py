@@ -1,9 +1,11 @@
 #! python3
+import concurrent
 import re, urllib.request, time
 from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup
 from loguru import logger
+from concurrent.futures import ThreadPoolExecutor
 
 emailRegex = re.compile(r'''
 #example :
@@ -92,6 +94,15 @@ def fetch_internal_links(url) -> list:
     logger.info(f"Found {len(internal_links)} internal links.")
     return internal_links
 
+def run_emailsLeechFunc_concurrently(urls):
+    with ThreadPoolExecutor(max_workers=30) as executor:
+        futures = {executor.submit(emailsLeechFunc, url, i): url for i, url in enumerate(urls)}
+        for future in concurrent.futures.as_completed(futures):
+            url = futures[future]
+            try:
+                future.result()  # get the result of the function
+            except Exception as exc:
+                print(f'{url} generated an exception: {exc}')
 
 links = fetch_internal_links('http://prota.com.tr')
 for link in links:
@@ -107,9 +118,7 @@ for urlLink in urlFile.readlines():
     urlLink = urlLink.strip('\'"')
     urlLink = add_http_if_missing(urlLink)
     urls = fetch_internal_links(urlLink)
-    for url in urls:
-        i = i + 1
-        emailsLeechFunc(url, i)
+    run_emailsLeechFunc_concurrently(urls)
 
 print ("Elapsed Time: %s" % (time.time() - start))
 
