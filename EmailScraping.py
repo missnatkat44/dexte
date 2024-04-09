@@ -79,6 +79,7 @@ def fetch_internal_links(url) -> list:
         response = urllib.request.urlopen(request)
     except Exception as e:
         logger.error(e)
+        return []
 
     logger.info(f"Response from {url}")
     soup = BeautifulSoup(response, 'html.parser')
