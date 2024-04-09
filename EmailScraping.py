@@ -71,33 +71,32 @@ def add_http_if_missing(url):
         return url
 
 def fetch_internal_links(url) -> set[str]:
-    logger.info(f"Fetching Internal Links from {url}")
-    headers = { 'User-Agent' : 'Mozilla/5.0' }
-    request = urllib.request.Request(url, None, headers)
-    logger.info(f"Requesting {url}")
     try:
+        logger.info(f"Fetching Internal Links from {url}")
+        headers = { 'User-Agent' : 'Mozilla/5.0' }
+        request = urllib.request.Request(url, None, headers)
+        logger.info(f"Requesting {url}")
         response = urllib.request.urlopen(request)
+        logger.info(f"Response from {url}")
+        soup = BeautifulSoup(response, 'html.parser')
+        internal_links = set()
+
+        excluded_domains = ['tiktok', 'twitter', 'facebook', 'instagram', 'linkedin', 'youtube', 'reddit', 'google', 'yandex']
+
+        for link in soup.find_all('a'):
+            href = link.get('href')
+            if href:
+                href = urljoin(url, href)  # Join the URL with the href
+                href_domain = urlparse(href).netloc  # Get domain of the href
+                # Only add href to internal_links if its domain matches the URL's domain,
+                # and it does not belong to the excluded domains
+                if not any(excluded in href_domain for excluded in excluded_domains):
+                    internal_links.add(href)
+        logger.info(f"Found {len(internal_links)} internal links.")
+        return internal_links
     except Exception as e:
         logger.error(e)
-        return []
-
-    logger.info(f"Response from {url}")
-    soup = BeautifulSoup(response, 'html.parser')
-    internal_links = set()
-
-    excluded_domains = ['tiktok', 'twitter', 'facebook', 'instagram', 'linkedin', 'youtube', 'reddit', 'google', 'yandex']
-
-    for link in soup.find_all('a'):
-        href = link.get('href')
-        if href:
-            href = urljoin(url, href)  # Join the URL with the href
-            href_domain = urlparse(href).netloc  # Get domain of the href
-            # Only add href to internal_links if its domain matches the URL's domain,
-            # and it does not belong to the excluded domains
-            if not any(excluded in href_domain for excluded in excluded_domains):
-                internal_links.add(href)
-    logger.info(f"Found {len(internal_links)} internal links.")
-    return internal_links
+        return set()
 
 emails = set()
 all_urls = set()
@@ -132,31 +131,34 @@ def run_program(urlfile, emailfile):
 
 current_index = 1
 def fetch_emails_with_depth(urls, emailfile):
-    with ThreadPoolExecutor(max_workers=15) as executor:
-        futures = {executor.submit(emailsLeechFunc, url, i): url for i, url in enumerate(urls)}
+    try:
+        with ThreadPoolExecutor(max_workers=15) as executor:
+            futures = {executor.submit(emailsLeechFunc, url, i): url for i, url in enumerate(urls)}
 
-        def callback(future):
-            global current_index
-            url = futures[future]
-            try:
-                # Add a timeout of 5 seconds
-                fetched = future.result(timeout=5)  # get the result of the function
-                for email in fetched:
-                    current_index = current_index + 1
-                    emails.add(email)
-                    logger.info(f"Total emails found: {len(emails)}")
-            except concurrent.futures.TimeoutError:
-                logger.warning(f'Timeout: {url} took too long to complete.')
-            except Exception as exc:
-                logger.error(f'{url} generated an exception: {exc}')
-            if all(f.done() for f in futures):
-                logger.info("All futures are done.")
-                # Write all to emails.txt
-                for email in emails:
-                    emailfile.write(f"{email}\n")
+            def callback(future):
+                global current_index
+                url = futures[future]
+                try:
+                    # Add a timeout of 5 seconds
+                    fetched = future.result(timeout=5)  # get the result of the function
+                    for email in fetched:
+                        current_index = current_index + 1
+                        emails.add(email)
+                        logger.info(f"Total emails found: {len(emails)}")
+                except concurrent.futures.TimeoutError:
+                    logger.warning(f'Timeout: {url} took too long to complete.')
+                except Exception as exc:
+                    logger.error(f'{url} generated an exception: {exc}')
+                if all(f.done() for f in futures):
+                    logger.info("All futures are done.")
+                    # Write all to emails.txt
+                    for email in emails:
+                        emailfile.write(f"{email}\n")
 
-        for future in futures:
-            future.add_done_callback(callback)
+            for future in futures:
+                future.add_done_callback(callback)
+    except Exception as e:
+        logger.error(e)
 
 if __name__ == "__main__":
     start = time.time()
