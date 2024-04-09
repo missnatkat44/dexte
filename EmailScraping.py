@@ -81,7 +81,7 @@ def fetch_internal_links(url) -> set[str]:
         soup = BeautifulSoup(response, 'html.parser')
         internal_links = set()
 
-        excluded_domains = ['tiktok', 'twitter', 'facebook', 'instagram', 'linkedin', 'youtube', 'reddit', 'google', 'yandex']
+        excluded_domains = ['onedio', 'tiktok', 'twitter', 'facebook', 'instagram', 'linkedin', 'youtube', 'reddit', 'google', 'yandex']
 
         for link in soup.find_all('a'):
             href = link.get('href')
@@ -105,9 +105,7 @@ def run_program(urlfile, emailfile):
     for urlLink in urlfile.readlines():
         urlLink = urlLink.strip('\'"')
         urlLink = add_http_if_missing(urlLink)
-        fetched = fetch_internal_links(urlLink)
-        for url in fetched:
-            urls.add(url)
+        urls.add(urlLink)
     logger.info(f"urls: {urls}")
 
     with ThreadPoolExecutor(max_workers=20) as executor:
@@ -124,7 +122,9 @@ def run_program(urlfile, emailfile):
                 logger.error(f'{temp} generated an exception: {exc}')
             if all(f.done() for f in futures):
                 logger.info("All futures are done for internal links.")
-                fetch_emails_with_depth(all_urls, emailfile)
+                for url in all_urls:
+                    emailfile.write(f"{url}\n")
+                # fetch_emails_with_depth(all_urls, emailfile)
 
         for future in futures:
             future.add_done_callback(callback)
