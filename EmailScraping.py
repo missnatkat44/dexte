@@ -75,7 +75,11 @@ def fetch_internal_links(url) -> list:
     headers = { 'User-Agent' : 'Mozilla/5.0' }
     request = urllib.request.Request(url, None, headers)
     logger.info(f"Requesting {url}")
-    response = urllib.request.urlopen(request)
+    try:
+        response = urllib.request.urlopen(request)
+    except Exception as e:
+        logger.error(e)
+
     logger.info(f"Response from {url}")
     soup = BeautifulSoup(response, 'html.parser')
     internal_links = []
